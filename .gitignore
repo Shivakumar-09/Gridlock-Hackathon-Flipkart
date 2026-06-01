@@ -1,0 +1,17 @@
+# Dataset and Predictions
+*.csv
+dataset/
+submission.csv
+
+# Models and metadata
+catboost_info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Log and temp files
+*.log
+*.tmp
+.idea/
+.vscode/
