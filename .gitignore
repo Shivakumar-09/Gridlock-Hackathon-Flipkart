@@ -1,17 +1,11 @@
-# Dataset and Predictions
-*.csv
-dataset/
-submission.csv
-
-# Models and metadata
-catboost_info/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# Log and temp files
 *.log
 *.tmp
-.idea/
-.vscode/
+catboost_info/
+dataset/
+*.csv
+.ipynb_checkpoints/
+.env
+venv/
+.venv/
