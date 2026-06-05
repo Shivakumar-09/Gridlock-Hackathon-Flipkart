@@ -1,223 +1,238 @@
 # 🚦 Flipkart Gridlock Hackathon 2.0
 
-## High-Performance Traffic Demand Prediction using Ensemble Learning
+## Traffic Demand Prediction using Ensemble Machine Learning
 
-### Final Validation R² Score: **0.96198**
+### Public Leaderboard Score: **91.19290**
 
-This repository contains our complete end-to-end machine learning solution built for **Flipkart Gridlock Hackathon 2.0**, focused on large-scale **traffic demand forecasting** using spatial, temporal, and contextual traffic signals.
-
-The final ensemble achieved an **Out-of-Fold Validation R² Score of 0.96198**, making it a highly competitive leaderboard solution optimized for real-world traffic prediction.
+### Cross-Validation (OOF) R² Score: **0.96198**
 
 ---
 
-# 🏆 Project Highlights
+## 📌 Overview
 
-* ✅ Final Validation R²: **0.96198**
-* ✅ Built using **CatBoost + LightGBM + XGBoost Ensemble**
-* ✅ Optimized with **GPU-accelerated training**
-* ✅ Leakage-safe temporal feature engineering
-* ✅ Advanced ensemble blending with **Scipy optimization**
-* ✅ End-to-end automated pipeline for training, validation, and submission generation
+This repository contains my complete end-to-end machine learning solution developed for **Flipkart Gridlock Hackathon 2.0**.
 
----
+The objective of the competition was to predict traffic demand using spatial, temporal, environmental, and road network information. The solution combines advanced feature engineering, temporal traffic pattern analysis, and ensemble learning to build a robust demand forecasting pipeline.
 
-# Problem Statement
+The final solution achieved:
 
-The challenge focuses on predicting **traffic demand** across different locations and timestamps using historical traffic patterns and road metadata.
-
-Each prediction is influenced by:
-
-* 📍 Spatial location (`geohash`)
-* ⏰ Time of day (`timestamp`)
-* 🛣️ Road characteristics (`RoadType`, `NumberofLanes`)
-* 🚚 Vehicle composition (`LargeVehicles`)
-* 🌦️ Environmental conditions (`Weather`, `Temperature`)
-* 🏙️ Urban context (`Landmarks`)
+* **Public Leaderboard Score:** 91.19290
+* **Out-of-Fold Validation R²:** 0.96198
+* **Models:** CatBoost, LightGBM, XGBoost
+* **Ensemble Optimization:** Scipy L-BFGS-B
 
 ---
 
-# Core Approach & Key Insights
+# 🏆 Key Highlights
 
-## 1. Temporal Traffic Pattern Discovery
+✅ Public Leaderboard Score: **91.19290**
 
-A detailed exploratory analysis revealed a strong daily repetition pattern in traffic movement.
+✅ Validation R² Score: **0.96198**
 
-### Key finding:
+✅ CatBoost + LightGBM + XGBoost Ensemble
 
-Traffic demand from **Day 48** showed a high correlation with traffic demand on **Day 49** for the same geohash and timestamp.
+✅ Temporal Feature Engineering
 
-### Observed correlation:
+✅ Spatial Aggregation Features
 
-```text
+✅ GPU Accelerated Training
+
+✅ Reproducible Submission Pipeline
+
+✅ HackerEarth Submission Ready
+
+---
+
+# 📊 Problem Statement
+
+The challenge focuses on forecasting traffic demand across multiple geographic locations and timestamps.
+
+The prediction depends on:
+
+* 📍 Geographical Location (`geohash`)
+* ⏰ Time Information (`timestamp`)
+* 🛣️ Road Infrastructure (`RoadType`, `NumberofLanes`)
+* 🚚 Vehicle Distribution (`LargeVehicles`)
+* 🌦️ Environmental Factors (`Weather`, `Temperature`)
+* 🏙️ Nearby Landmarks (`Landmarks`)
+
+Accurate demand forecasting can help improve traffic management, transportation planning, and urban mobility systems.
+
+---
+
+# 🔍 Exploratory Data Analysis
+
+A detailed analysis of the dataset revealed strong temporal patterns.
+
+### Major Observation
+
+Traffic demand exhibits daily periodic behavior.
+
+Demand values from Day 48 showed strong predictive power for corresponding locations and times on Day 49.
+
+### Observed Correlation
+
 0.79239
-```
 
-This became the foundation of our modeling strategy.
-
----
-
-## 2. Leakage-Free Temporal Feature Engineering
-
-To capture temporal dependencies without leaking target information, we engineered:
-
-### Temporal Lag Features
-
-* `demand_lag_1day`
-* `lag_15min`
-* `lag_30min`
-* `lag_45min`
-* `lag_60min`
-
-These capture short-term traffic behavior around the same time window.
+This insight formed the foundation of the feature engineering strategy.
 
 ---
 
-### Spatial Aggregations
+# ⚙️ Feature Engineering
 
-Per-geohash aggregated statistics:
+## Temporal Features
 
-* mean demand
-* standard deviation
-* min demand
-* max demand
-* peak-hour average
+The following lag-based features were engineered:
 
-These features help model recurring traffic behavior per location.
+* demand_lag_1day
+* lag_15min
+* lag_30min
+* lag_45min
+* lag_60min
 
----
-
-## 3. Multi-Model Ensemble Architecture
-
-To maximize predictive performance, three complementary gradient boosting models were trained under **5-Fold Cross Validation**.
+These features capture local traffic trends surrounding a particular timestamp.
 
 ---
 
-### 🚀 CatBoostRegressor (GPU)
+## Spatial Aggregations
 
-Primary model for handling structured categorical traffic features efficiently.
+Per-geohash statistics:
 
-Used for:
+* Mean Demand
+* Standard Deviation
+* Maximum Demand
+* Minimum Demand
+* Peak Hour Average
 
-* `RoadType`
-* `Weather`
-* `LargeVehicles`
-* `Landmarks`
-
----
-
-### ⚡ LightGBMRegressor
-
-Fast and highly effective on engineered numerical traffic features.
-
-Strong performance on:
-
-* lag-based temporal signals
-* aggregation statistics
-* interaction features
+These features help model recurring traffic behavior at specific locations.
 
 ---
 
-### 🌳 XGBoostRegressor (GPU)
+# 🤖 Model Architecture
 
-Used to increase model diversity and strengthen ensemble generalization.
+Three complementary gradient boosting models were trained using 5-Fold Cross Validation.
+
+## 🚀 CatBoostRegressor
+
+Optimized for categorical traffic features:
+
+* RoadType
+* Weather
+* LargeVehicles
+* Landmarks
+
+Validation R²:
+
+0.96097
 
 ---
 
-# Ensemble Optimization
+## ⚡ LightGBMRegressor
 
-Instead of equal averaging, we used **Scipy’s optimization (`L-BFGS-B`)** to find the optimal blending weights by maximizing Out-of-Fold R².
+Optimized for engineered numerical features:
 
-## Final Blend Weights
+* Temporal lags
+* Aggregations
+* Interaction features
 
-| Model    |     Weight |
-| -------- | ---------: |
-| CatBoost | **0.4794** |
-| LightGBM | **0.4491** |
-| XGBoost  | **0.0715** |
+Validation R²:
+
+0.96095
+
+---
+
+## 🌳 XGBoostRegressor
+
+Used to increase ensemble diversity and improve generalization.
+
+Validation R²:
+
+0.96022
+
+---
+
+# 🎯 Ensemble Optimization
+
+Instead of simple averaging, Scipy's L-BFGS-B optimizer was used to determine optimal blending weights.
+
+## Final Ensemble Weights
+
+| Model    | Weight |
+| -------- | ------ |
+| CatBoost | 0.4794 |
+| LightGBM | 0.4491 |
+| XGBoost  | 0.0715 |
 
 ---
 
 # 📈 Model Performance
 
-| Model              | OOF R² Score |
-| ------------------ | -----------: |
-| CatBoostRegressor  |  **0.96097** |
-| LightGBMRegressor  |  **0.96095** |
-| XGBoostRegressor   |  **0.96022** |
-| **Final Ensemble** |  **0.96198** |
+| Model              | OOF R²      |
+| ------------------ | ----------- |
+| CatBoost           | 0.96097     |
+| LightGBM           | 0.96095     |
+| XGBoost            | 0.96022     |
+| **Final Ensemble** | **0.96198** |
 
 ---
 
-# 📂 Project Structure
+# 📂 Repository Structure
 
 ```text
 Gridlock-Hackathon-Flipkart/
 │
-├── dataset/                     # Local dataset folder (not pushed to Git)
+├── README.md
+├── requirements.txt
+├── .gitignore
 │
-├── solution.py                  # Initial baseline model
-├── solution_v2.py              # Final ensemble training pipeline
-├── solution_v3.py              # Post-training optimization experiments
+├── solution.py
+├── solution_v2.py
 │
-├── inspect_data.py             # Dataset audit & profiling
-├── inspect_times.py            # Temporal pattern analysis
-├── inspect_day49.py            # Day-wise timestamp inspection
-├── inspect_correlation.py      # Traffic correlation analysis
+├── inspect_data.py
+├── inspect_times.py
+├── inspect_day49.py
+├── inspect_correlation.py
 │
-├── experiments.md              # Experiment history & score tracking
-├── walkthrough.md              # Submission workflow & project notes
-├── task.md                     # Project task checklist
+├── experiments.md
+├── walkthrough.md
 │
-└── README.md
+└── submission.csv
 ```
 
 ---
 
-# Tech Stack
+# 🛠️ Installation
 
-* Python
-* Pandas
-* NumPy
-* Scikit-learn
-* CatBoost
-* LightGBM
-* XGBoost
-* SciPy
-
----
-
-# Installation
-
-Install required dependencies:
+Install required packages:
 
 ```bash
-pip install pandas numpy scikit-learn lightgbm xgboost catboost scipy
+pip install -r requirements.txt
 ```
 
 ---
 
-# Run the Pipeline
+# ▶️ Reproducing the Results
 
-Execute:
+Run:
 
 ```bash
 python solution_v2.py
 ```
 
-This pipeline will:
+The pipeline performs:
 
-* load the training and test datasets
-* perform feature engineering
-* train all models using cross-validation
-* optimize ensemble blending weights
-* evaluate validation performance
-* generate `submission.csv`
+1. Data Loading
+2. Feature Engineering
+3. Cross Validation
+4. Model Training
+5. Ensemble Optimization
+6. Submission Generation
 
 ---
 
-# Output
+# 📤 Output
 
-The pipeline generates:
+The final output file:
 
 ```text
 submission.csv
@@ -239,25 +254,35 @@ ready for upload to HackerEarth.
 
 ---
 
-# Final Result
+# 📋 Competition Results
 
-## Best Validation Score
+| Metric                   | Score    |
+| ------------------------ | -------- |
+| Public Leaderboard Score | 91.19290 |
+| OOF Validation R²        | 0.96198  |
 
-```text
-R² = 0.96198
-```
+### Note
 
-This project demonstrates how **temporal feature engineering**, **domain-specific traffic insights**, and **ensemble learning** can be combined to build a highly accurate traffic demand forecasting system.
+The public leaderboard score is evaluated on a hidden test set and therefore differs from the validation score obtained during model training.
 
 ---
 
-# Author
+# 👨‍💻 Author
 
-### Shiva Kumar
+**Shiva Kumar**
 
-Built for **Flipkart Gridlock Hackathon 2.0** with a focus on:
+Built for Flipkart Gridlock Hackathon 2.0
+
+Areas of Focus:
 
 * Machine Learning
-* Traffic Forecasting
-* Ensemble Modeling
-* Real-world Predictive Systems
+* Traffic Demand Forecasting
+* Ensemble Learning
+* Feature Engineering
+* Real-World Predictive Analytics
+
+---
+
+## ⭐ Acknowledgements
+
+Special thanks to Flipkart and HackerEarth for organizing Gridlock Hackathon 2.0 and providing an opportunity to work on a real-world traffic forecasting challenge.
