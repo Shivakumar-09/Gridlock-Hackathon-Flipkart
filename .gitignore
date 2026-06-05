@@ -1,14 +1,14 @@
 __pycache__/
 *.pyc
-*.pyo
 *.log
 *.tmp
 *.cache
+
 catboost_info/
+
 dataset/
 archive/
-*.csv
-.ipynb_checkpoints/
+
 .env
 venv/
 .venv/

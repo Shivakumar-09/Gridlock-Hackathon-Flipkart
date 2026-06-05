@@ -27,11 +27,9 @@ print("Test unique geohashes:", test['geohash'].nunique())
 overlap = set(train['geohash'].unique()) & set(test['geohash'].unique())
 print("Geohash overlap:", len(overlap))
 
-# Let's see some geohash-timestamp combinations
 print("\nTrain day 49 geohash-timestamp unique combinations:", len(train[train['day'] == 49].groupby(['geohash', 'timestamp'])))
 print("Test day 49 geohash-timestamp unique combinations:", len(test[test['day'] == 49].groupby(['geohash', 'timestamp'])))
 
-# Are there overlapping geohash-timestamp in train and test on day 49?
 train_49_pairs = set(train[train['day'] == 49].apply(lambda r: f"{r['geohash']}_{r['timestamp']}", axis=1))
 test_49_pairs = set(test[test['day'] == 49].apply(lambda r: f"{r['geohash']}_{r['timestamp']}", axis=1))
 print("Overlapping (geohash, timestamp) pairs on day 49 between train and test:", len(train_49_pairs & test_49_pairs))

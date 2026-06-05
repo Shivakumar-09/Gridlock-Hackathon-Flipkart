@@ -1,6 +1,0 @@
-- [x] Implement advanced Day 48 lag features and spatial statistics in the feature engineering pipeline.
-- [x] Update the model scripts to use the RTX 2050 GPU (CatBoost and XGBoost).
-- [x] Run the complete 5-fold cross-validation pipeline and monitor training.
-- [x] Automatically search for mathematically optimal ensemble weights.
-- [x] Conduct out-of-fold error analysis.
-- [x] Generate and verify the final `submission.csv` file.

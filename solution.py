@@ -1,10 +1,4 @@
 
-# =============================================================================
-# FLIPKART GRIDLOCK HACKATHON 2.0 — GRANDMASTER-LEVEL SOLUTION
-# Objective: Maximize R² on traffic demand prediction
-# Target: Beat leaderboard #1 (~93.12) from current 91.60
-# =============================================================================
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -24,9 +18,6 @@ np.random.seed(SEED)
 DATA_DIR = r"c:\hackathon\flipkart\dataset"
 OUT_DIR  = r"c:\hackathon\flipkart"
 
-# =============================================================================
-# PHASE 1 — DEEP DATASET AUDIT
-# =============================================================================
 print("=" * 70)
 print("PHASE 1 — DEEP DATASET AUDIT")
 print("=" * 70)
@@ -62,10 +53,6 @@ print(f"\nGeohash overlap: {len(overlap)}/{len(test_hashes)} ({len(overlap)/len(
 print("\n--- Train days:", sorted(train["day"].unique()))
 print("--- Test  days:", sorted(test["day"].unique()))
 
-
-# =============================================================================
-# PHASE 2 — FEATURE ENGINEERING
-# =============================================================================
 print("\n" + "=" * 70)
 print("PHASE 2 — FEATURE ENGINEERING")
 print("=" * 70)
@@ -76,24 +63,20 @@ def parse_ts(ts):
     m = int(parts[1]) if len(parts) > 1 else 0
     return h, m
 
-
 def base_features(df):
     df = df.copy()
 
-    # Timestamp
     df[["hour", "minute"]] = pd.DataFrame(
         df["timestamp"].apply(parse_ts).tolist(), index=df.index
     )
     df["total_minutes"] = df["hour"] * 60 + df["minute"]
 
-    # Time flags
     df["peak_hour"]    = ((df["hour"].between(7, 9)) | (df["hour"].between(17, 19))).astype(int)
     df["morning_peak"] = df["hour"].between(7, 9).astype(int)
     df["evening_peak"] = df["hour"].between(17, 19).astype(int)
     df["late_night"]   = ((df["hour"] >= 23) | (df["hour"] <= 4)).astype(int)
     df["midday"]       = df["hour"].between(11, 14).astype(int)
 
-    # Cyclic
     df["sin_hour"]   = np.sin(2 * np.pi * df["hour"]   / 24)
     df["cos_hour"]   = np.cos(2 * np.pi * df["hour"]   / 24)
     df["sin_minute"] = np.sin(2 * np.pi * df["minute"] / 60)
@@ -101,13 +84,11 @@ def base_features(df):
     df["sin_total"]  = np.sin(2 * np.pi * df["total_minutes"] / 1440)
     df["cos_total"]  = np.cos(2 * np.pi * df["total_minutes"] / 1440)
 
-    # Geohash prefixes
     df["gh_prefix4"] = df["geohash"].str[:4]
     df["gh_prefix5"] = df["geohash"].str[:5]
     df["gh_prefix6"] = df["geohash"].str[:6]
     df["geohash_len"] = df["geohash"].str.len()
 
-    # Categoricals: fill & encode
     df["RoadType"]      = df["RoadType"].fillna("Unknown")
     df["Weather"]       = df["Weather"].fillna("Unknown")
     df["LargeVehicles"] = df["LargeVehicles"].fillna("Unknown")
@@ -120,7 +101,6 @@ def base_features(df):
     df["large_veh_bin"]  = (df["LargeVehicles"] == "Allowed").astype(int)
     df["landmarks_bin"]  = (df["Landmarks"] == "Yes").astype(int)
 
-    # Numeric: fill
     df["NumberofLanes"]  = df["NumberofLanes"].fillna(df["NumberofLanes"].median())
     df["Temperature"]    = df["Temperature"].fillna(df["Temperature"].median())
     df["temp_extreme"]   = ((df["Temperature"] > 35) | (df["Temperature"] < 0)).astype(int)
@@ -130,7 +110,6 @@ def base_features(df):
         labels=[0, 1, 2, 3, 4]
     ).astype(float).fillna(2)
 
-    # Domain features
     df["road_capacity"]  = df["NumberofLanes"] * df["large_veh_bin"]
     df["road_capacity2"] = df["NumberofLanes"] * df["road_type_ord"]
     df["congestion_potential"] = (
@@ -146,12 +125,10 @@ def base_features(df):
 
     return df
 
-
 train = base_features(train)
 test  = base_features(test)
 print("Base features done.")
 
-# ── Geohash frequency (no leakage — computed from full train) ─────────────────
 gh_freq  = train["geohash"].value_counts().to_dict()
 gh4_freq = train["gh_prefix4"].value_counts().to_dict()
 gh5_freq = train["gh_prefix5"].value_counts().to_dict()
@@ -161,9 +138,6 @@ for df in [train, test]:
     df["gh_prefix4_freq"] = df["gh_prefix4"].map(gh4_freq).fillna(0)
     df["gh_prefix5_freq"] = df["gh_prefix5"].map(gh5_freq).fillna(0)
 
-# =============================================================================
-# LEAKAGE-SAFE TARGET ENCODING
-# =============================================================================
 print("Building target encodings (KFold OOF, 5 folds)...")
 
 TARGET   = "demand"
@@ -181,7 +155,6 @@ def kfold_te(train_df, test_df, group_cols, target=TARGET, n_folds=N_TE_FOLD, ag
     key_name = "__".join(group_cols)
     col_name = f"te__{key_name}__{agg}"
 
-    # Build composite key
     tr_key = train_df[group_cols].astype(str).agg("|".join, axis=1)
     te_key = test_df[group_cols].astype(str).agg("|".join, axis=1)
 
@@ -198,7 +171,6 @@ def kfold_te(train_df, test_df, group_cols, target=TARGET, n_folds=N_TE_FOLD, ag
         val_keys = tr_key.iloc[val_idx]
         tr_enc[val_idx] = val_keys.map(fold_map).fillna(global_mean).values
 
-    # Test: use full train stats
     tmp_all = train_df.copy()
     tmp_all["__key"] = tr_key.values
     global_map = tmp_all.groupby("__key")[target].agg(agg)
@@ -206,10 +178,8 @@ def kfold_te(train_df, test_df, group_cols, target=TARGET, n_folds=N_TE_FOLD, ag
     te_enc = te_key.map(global_map).fillna(global_mean).values
     return tr_enc, te_enc, col_name
 
-
-# ── Encoding specs ────────────────────────────────────────────────────────────
 ENCODING_SPECS = [
-    # Single-column
+
     ("geohash",                               "mean"),
     ("geohash",                               "std"),
     ("geohash",                               "max"),
@@ -220,7 +190,7 @@ ENCODING_SPECS = [
     ("RoadType",                              "mean"),
     ("Weather",                               "mean"),
     ("NumberofLanes",                         "mean"),
-    # Multi-column
+
     (["geohash", "hour"],                     "mean"),
     (["geohash", "hour"],                     "std"),
     (["geohash", "day"],                      "mean"),
@@ -257,7 +227,6 @@ for spec_group, spec_agg in ENCODING_SPECS:
 
 print(f"\n{len(te_cols)} TE features created.")
 
-# ── Domain features from TE ───────────────────────────────────────────────────
 gh_mean_col     = "te__geohash__mean"
 gh_std_col      = "te__geohash__std"
 gh_hour_col     = "te__geohash__hour__mean"
@@ -284,9 +253,6 @@ for df in [train, test]:
 
 print("Domain features from TE done.")
 
-# =============================================================================
-# FEATURE LISTS
-# =============================================================================
 BASE_NUM = [
     "hour", "minute", "total_minutes",
     "peak_hour", "morning_peak", "evening_peak", "late_night", "midday",
@@ -302,7 +268,6 @@ BASE_NUM = [
     "road_x_hour", "lanes_x_hour", "lanes_x_peak", "road_x_weather",
 ]
 
-# CatBoost raw categoricals
 CAT_COLS = ["geohash", "gh_prefix4", "gh_prefix5", "gh_prefix6",
             "RoadType", "Weather", "LargeVehicles", "Landmarks"]
 
@@ -312,7 +277,6 @@ ALL_CB  = ALL_NUM + CAT_COLS
 print(f"\nNumeric features : {len(ALL_NUM)}")
 print(f"CatBoost features: {len(ALL_CB)}")
 
-# Prepare arrays
 X_train_num = train[ALL_NUM].copy().fillna(-999)
 X_test_num  = test[ALL_NUM].copy().fillna(-999)
 X_train_cb  = train[ALL_CB].copy().fillna(-999)
@@ -321,9 +285,6 @@ y_train     = train[TARGET].copy()
 
 cat_idx_cb = [ALL_CB.index(c) for c in CAT_COLS]
 
-# =============================================================================
-# PHASE 3 & 4 — MODEL TRAINING + VALIDATION
-# =============================================================================
 print("\n" + "=" * 70)
 print("PHASE 3 & 4 — MODEL TRAINING + VALIDATION (5-Fold KFold)")
 print("=" * 70)
@@ -331,9 +292,6 @@ print("=" * 70)
 N_FOLDS = 5
 kf = KFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MODEL A — CatBoost
-# ─────────────────────────────────────────────────────────────────────────────
 print("\n--- MODEL A: CatBoost ---")
 cb_oof  = np.zeros(len(train))
 cb_test = np.zeros(len(test))
@@ -374,9 +332,6 @@ for fold, (tr_idx, val_idx) in enumerate(kf.split(X_train_cb, y_train)):
 cb_oof_r2 = r2_score(y_train, cb_oof)
 print(f"\nCatBoost OOF R²: {cb_oof_r2:.5f}  Mean={np.mean(cb_scores):.5f}  Std={np.std(cb_scores):.5f}")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MODEL B — LightGBM
-# ─────────────────────────────────────────────────────────────────────────────
 print("\n--- MODEL B: LightGBM ---")
 lgb_oof  = np.zeros(len(train))
 lgb_test = np.zeros(len(test))
@@ -426,9 +381,6 @@ for fold, (tr_idx, val_idx) in enumerate(kf.split(X_train_num, y_train)):
 lgb_oof_r2 = r2_score(y_train, lgb_oof)
 print(f"\nLightGBM OOF R²: {lgb_oof_r2:.5f}  Mean={np.mean(lgb_scores):.5f}  Std={np.std(lgb_scores):.5f}")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MODEL C — XGBoost
-# ─────────────────────────────────────────────────────────────────────────────
 print("\n--- MODEL C: XGBoost ---")
 xgb_oof  = np.zeros(len(train))
 xgb_test = np.zeros(len(test))
@@ -477,9 +429,6 @@ for fold, (tr_idx, val_idx) in enumerate(kf.split(X_train_num, y_train)):
 xgb_oof_r2 = r2_score(y_train, xgb_oof)
 print(f"\nXGBoost OOF R²: {xgb_oof_r2:.5f}  Mean={np.mean(xgb_scores):.5f}  Std={np.std(xgb_scores):.5f}")
 
-# =============================================================================
-# PHASE 5 — ENSEMBLE OPTIMIZATION
-# =============================================================================
 print("\n" + "=" * 70)
 print("PHASE 5 — ENSEMBLE OPTIMIZATION")
 print("=" * 70)
@@ -487,7 +436,6 @@ print("=" * 70)
 oof_mat  = np.column_stack([cb_oof, lgb_oof, xgb_oof])
 test_mat = np.column_stack([cb_test, lgb_test, xgb_test])
 
-# Grid search
 step = 0.05
 grid_results = []
 for w1 in np.arange(0, 1 + 1e-9, step):
@@ -503,7 +451,6 @@ grid_results.sort(reverse=True)
 bscore, bw1, bw2, bw3 = grid_results[0]
 print(f"Grid best: CB={bw1:.2f} LGB={bw2:.2f} XGB={bw3:.2f} R²={bscore:.5f}")
 
-# Fine-tune with scipy
 def neg_r2(w):
     wn = np.array(w); wn = wn / wn.sum()
     return -r2_score(y_train, oof_mat @ wn)
@@ -516,9 +463,6 @@ print(f"Opt  best: CB={opt_w[0]:.4f} LGB={opt_w[1]:.4f} XGB={opt_w[2]:.4f} R²={
 
 final_pred = np.clip(test_mat @ opt_w, 0.0, 1.0)
 
-# =============================================================================
-# PHASE 6 — ERROR ANALYSIS
-# =============================================================================
 print("\n" + "=" * 70)
 print("PHASE 6 — ERROR ANALYSIS")
 print("=" * 70)
@@ -544,15 +488,10 @@ print(f"Overprediction (<-0.05): {(train['residual']<-0.05).sum()}")
 print("\nRoadType in high-error zone:")
 print(train[train["abs_err"]>0.10]["RoadType"].value_counts())
 
-# =============================================================================
-# PHASE 7 — FINAL SUBMISSION
-# =============================================================================
 print("\n" + "=" * 70)
 print("PHASE 7 — FINAL SUBMISSION")
 print("=" * 70)
 
-# Note: sample_submission has only 5 rows as format template.
-# Use test["Index"] as the true index source (41778 rows).
 assert len(final_pred) == len(test), f"Length mismatch! {len(final_pred)} vs {len(test)}"
 assert len(final_pred) == 41778, f"Row count wrong: {len(final_pred)}"
 
@@ -567,9 +506,6 @@ print(f"Range : [{final_pred.min():.6f}, {final_pred.max():.6f}]")
 print(f"Mean  : {final_pred.mean():.6f}")
 print(submission.head())
 
-# =============================================================================
-# FINAL SUMMARY
-# =============================================================================
 print("\n" + "=" * 70)
 print("FINAL SUMMARY")
 print("=" * 70)
@@ -584,7 +520,6 @@ Ensemble (opt)  {opt_r2:.5f}
 Weights: CB={opt_w[0]:.4f}  LGB={opt_w[1]:.4f}  XGB={opt_w[2]:.4f}
 """)
 
-# Feature importance
 fi = pd.DataFrame({
     "feature":    ALL_NUM,
     "importance": lgb_models[-1].feature_importance(importance_type="gain"),

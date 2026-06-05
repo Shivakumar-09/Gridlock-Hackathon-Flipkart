@@ -1,8 +1,3 @@
-# =============================================================================
-# FLIPKART GRIDLOCK HACKATHON 2.0 — ADVANCED SOLUTION
-# Objective: Maximize R² on traffic demand prediction
-# Target: Beat leaderboard #1 (~93.12)
-# =============================================================================
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -35,20 +30,17 @@ def parse_ts(ts):
 def base_features(df):
     df = df.copy()
 
-    # Timestamp
     df[["hour", "minute"]] = pd.DataFrame(
         df["timestamp"].apply(parse_ts).tolist(), index=df.index
     )
     df["total_minutes"] = df["hour"] * 60 + df["minute"]
 
-    # Time flags
     df["peak_hour"]    = ((df["hour"].between(7, 9)) | (df["hour"].between(17, 19))).astype(int)
     df["morning_peak"] = df["hour"].between(7, 9).astype(int)
     df["evening_peak"] = df["hour"].between(17, 19).astype(int)
     df["late_night"]   = ((df["hour"] >= 23) | (df["hour"] <= 4)).astype(int)
     df["midday"]       = df["hour"].between(11, 14).astype(int)
 
-    # Cyclic
     df["sin_hour"]   = np.sin(2 * np.pi * df["hour"]   / 24)
     df["cos_hour"]   = np.cos(2 * np.pi * df["hour"]   / 24)
     df["sin_minute"] = np.sin(2 * np.pi * df["minute"] / 60)
@@ -56,13 +48,11 @@ def base_features(df):
     df["sin_total"]  = np.sin(2 * np.pi * df["total_minutes"] / 1440)
     df["cos_total"]  = np.cos(2 * np.pi * df["total_minutes"] / 1440)
 
-    # Geohash prefixes
     df["gh_prefix4"] = df["geohash"].str[:4]
     df["gh_prefix5"] = df["geohash"].str[:5]
     df["gh_prefix6"] = df["geohash"].str[:6]
     df["geohash_len"] = df["geohash"].str.len()
 
-    # Categoricals: fill & encode
     df["RoadType"]      = df["RoadType"].fillna("Unknown")
     df["Weather"]       = df["Weather"].fillna("Unknown")
     df["LargeVehicles"] = df["LargeVehicles"].fillna("Unknown")
@@ -75,7 +65,6 @@ def base_features(df):
     df["large_veh_bin"]  = (df["LargeVehicles"] == "Allowed").astype(int)
     df["landmarks_bin"]  = (df["Landmarks"] == "Yes").astype(int)
 
-    # Numeric: fill
     df["NumberofLanes"]  = df["NumberofLanes"].fillna(df["NumberofLanes"].median())
     df["Temperature"]    = df["Temperature"].fillna(df["Temperature"].median())
     df["temp_extreme"]   = ((df["Temperature"] > 35) | (df["Temperature"] < 0)).astype(int)
@@ -85,7 +74,6 @@ def base_features(df):
         labels=[0, 1, 2, 3, 4]
     ).astype(float).fillna(2)
 
-    # Domain features
     df["road_capacity"]  = df["NumberofLanes"] * df["large_veh_bin"]
     df["road_capacity2"] = df["NumberofLanes"] * df["road_type_ord"]
     df["congestion_potential"] = (
@@ -169,11 +157,9 @@ ENCODING_SPECS = [
 ]
 
 def main():
-    # =============================================================================
-    # PHASE 1 — DEEP DATASET AUDIT
-    # =============================================================================
+
     print("=" * 70)
-    print("PHASE 1 — DEEP DATASET AUDIT")
+    print("PHASE 1 - DEEP DATASET AUDIT")
     print("=" * 70)
 
     train = pd.read_csv(os.path.join(DATA_DIR, "train.csv"))
@@ -193,18 +179,14 @@ def main():
     overlap = train_hashes & test_hashes
     print(f"\nGeohash overlap: {len(overlap)}/{len(test_hashes)} ({len(overlap)/len(test_hashes)*100:.1f}%)")
 
-    # =============================================================================
-    # PHASE 2 — FEATURE ENGINEERING
-    # =============================================================================
     print("\n" + "=" * 70)
-    print("PHASE 2 — FEATURE ENGINEERING")
+    print("PHASE 2 - FEATURE ENGINEERING")
     print("=" * 70)
 
     print("Extracting base features...")
     train = base_features(train)
     test  = base_features(test)
 
-    # Geohash frequency
     gh_freq  = train["geohash"].value_counts().to_dict()
     gh4_freq = train["gh_prefix4"].value_counts().to_dict()
     gh5_freq = train["gh_prefix5"].value_counts().to_dict()
@@ -214,15 +196,10 @@ def main():
         df["gh_prefix4_freq"] = df["gh_prefix4"].map(gh4_freq).fillna(0)
         df["gh_prefix5_freq"] = df["gh_prefix5"].map(gh5_freq).fillna(0)
 
-    # =============================================================================
-    # ADVANCED TEMPORAL LAG & HISTORICAL FEATURES (DAY 48 AS SOURCE)
-    # =============================================================================
     print("Creating Day 48 lag and historical features...")
 
-    # Pivot/Lookup from Day 48 train data
     df_48 = train[train['day'] == 48].copy()
 
-    # Day 48 geohash-specific stats
     gh_stats_48 = df_48.groupby('geohash')['demand'].agg(
         gh_day48_mean='mean',
         gh_day48_std='std',
@@ -234,7 +211,6 @@ def main():
     gh_mpeak_48 = df_48[df_48['hour'].isin([7,8,9])].groupby('geohash')['demand'].mean().rename('gh_day48_morning_peak_mean').reset_index()
     gh_epeak_48 = df_48[df_48['hour'].isin([17,18,19])].groupby('geohash')['demand'].mean().rename('gh_day48_evening_peak_mean').reset_index()
 
-    # Merge overall statistics directly
     train = pd.merge(train, gh_stats_48, on='geohash', how='left')
     train = pd.merge(train, gh_peak_48, on='geohash', how='left')
     train = pd.merge(train, gh_mpeak_48, on='geohash', how='left')
@@ -245,43 +221,34 @@ def main():
     test = pd.merge(test, gh_mpeak_48, on='geohash', how='left')
     test = pd.merge(test, gh_epeak_48, on='geohash', how='left')
 
-    # Set all stats features to NaN on day 48 to prevent leakage
-    stats_cols = ['gh_day48_mean', 'gh_day48_std', 'gh_day48_max', 'gh_day48_min', 
+    stats_cols = ['gh_day48_mean', 'gh_day48_std', 'gh_day48_max', 'gh_day48_min',
                   'gh_day48_peak_mean', 'gh_day48_morning_peak_mean', 'gh_day48_evening_peak_mean']
     train.loc[train['day'] == 48, stats_cols] = np.nan
 
-    # Merge direct lag demand and neighbor offset demand
     df_48_ref = df_48[['geohash', 'total_minutes', 'demand']].copy()
 
-    # Add exact 24h lag
     exact_lag = df_48_ref.rename(columns={'demand': 'demand_lag_1day'})
     train = pd.merge(train, exact_lag, on=['geohash', 'total_minutes'], how='left')
     test  = pd.merge(test, exact_lag, on=['geohash', 'total_minutes'], how='left')
 
-    # Add neighbor lags to build temporal context
     offsets = [-60, -45, -30, -15, 15, 30, 45, 60]
     for offset in offsets:
         df_48_ref_offset = df_48_ref.copy()
         df_48_ref_offset['total_minutes'] = df_48_ref_offset['total_minutes'] - offset
         col_name = f"demand_lag_1day_offset_{offset}" if offset > 0 else f"demand_lag_1day_offset_m{abs(offset)}"
         df_48_ref_offset = df_48_ref_offset.rename(columns={'demand': col_name})
-        
+
         train = pd.merge(train, df_48_ref_offset, on=['geohash', 'total_minutes'], how='left')
         test  = pd.merge(test, df_48_ref_offset, on=['geohash', 'total_minutes'], how='left')
 
-    # Set all lag features to NaN on day 48 to prevent leakage
     lag_cols = [c for c in train.columns if 'demand_lag_1day' in c]
     train.loc[train['day'] == 48, lag_cols] = np.nan
 
-    # Imputed versions of the main 24h lag to handle spatial missingness
     train['demand_lag_1day_imputed'] = train['demand_lag_1day'].fillna(train['gh_day48_mean']).fillna(0.09394)
     test['demand_lag_1day_imputed'] = test['demand_lag_1day'].fillna(test['gh_day48_mean']).fillna(0.09394)
 
     print("Lag features done.")
 
-    # =============================================================================
-    # LEAKAGE-SAFE TARGET ENCODING (KFOLD OOF)
-    # =============================================================================
     print("Building leakage-safe target encodings...")
 
     te_cols = []
@@ -293,9 +260,6 @@ def main():
 
     print(f"{len(te_cols)} TE features created.")
 
-    # =============================================================================
-    # DOMAIN FEATURES (REFINED WITH LAGS)
-    # =============================================================================
     gh_mean_col     = "te__geohash__mean"
     gh_std_col      = "te__geohash__std"
     gh_hour_col     = "te__geohash__hour__mean"
@@ -314,7 +278,6 @@ def main():
         df["gh_cv"]   = (df[gh_std_col] / (df[gh_mean_col] + 1e-9)).clip(0, 10)
         df["gh_rank"] = df[gh_mean_col].rank(pct=True)
 
-        # Contextual capacity pressure using our Day 48 lags
         df["lane_pressure_lag"] = df["demand_lag_1day_imputed"] / (df["NumberofLanes"] + 1e-6)
         df["congestion_potential_lag"] = (
             df["road_type_ord"] * 0.3 +
@@ -325,9 +288,6 @@ def main():
 
     print("Domain features from TE & Lags done.")
 
-    # =============================================================================
-    # FEATURE LISTS
-    # =============================================================================
     BASE_NUM = [
         "hour", "minute", "total_minutes",
         "peak_hour", "morning_peak", "evening_peak", "late_night", "midday",
@@ -358,7 +318,6 @@ def main():
     print(f"\nNumeric features : {len(ALL_NUM)}")
     print(f"CatBoost features: {len(ALL_CB)}")
 
-    # Prepare arrays
     X_train_num = train[ALL_NUM].copy().fillna(-999)
     X_test_num  = test[ALL_NUM].copy().fillna(-999)
     X_train_cb  = train[ALL_CB].copy().fillna(-999)
@@ -367,19 +326,13 @@ def main():
 
     cat_idx_cb = [ALL_CB.index(c) for c in CAT_COLS]
 
-    # =============================================================================
-    # PHASE 3 & 4 — MODEL TRAINING + VALIDATION (5-Fold KFold)
-    # =============================================================================
     print("\n" + "=" * 70)
-    print("PHASE 3 & 4 — MODEL TRAINING + VALIDATION (5-Fold KFold on GPU)")
+    print("PHASE 3 & 4 - MODEL TRAINING + VALIDATION (5-Fold KFold on GPU)")
     print("=" * 70)
 
     N_FOLDS = 5
     kf = KFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED)
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # MODEL A — CatBoost (GPU Accelerated)
-    # ─────────────────────────────────────────────────────────────────────────────
     print("\n--- MODEL A: CatBoost ---")
     cb_oof  = np.zeros(len(train))
     cb_test = np.zeros(len(test))
@@ -399,7 +352,7 @@ def main():
             cat_features=cat_idx_cb,
             eval_metric="RMSE",
             loss_function="RMSE",
-            task_type="CPU",
+            task_type="GPU",
             thread_count=-1,
             random_seed=SEED + fold,
             verbose=0,
@@ -413,14 +366,11 @@ def main():
         cb_scores.append(score)
         cb_oof[val_idx]  = val_pred
         cb_test         += model.predict(X_test_cb) / N_FOLDS
-        print(f"R²={score:.5f}  ({time.time()-t0:.1f}s)")
+        print(f"R2={score:.5f}  ({time.time()-t0:.1f}s)")
 
     cb_oof_r2 = r2_score(y_train, cb_oof)
-    print(f"\nCatBoost OOF R²: {cb_oof_r2:.5f}  Mean={np.mean(cb_scores):.5f}  Std={np.std(cb_scores):.5f}")
+    print(f"\nCatBoost OOF R2: {cb_oof_r2:.5f}  Mean={np.mean(cb_scores):.5f}  Std={np.std(cb_scores):.5f}")
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # MODEL B — LightGBM (CPU)
-    # ─────────────────────────────────────────────────────────────────────────────
     print("\n--- MODEL B: LightGBM ---")
     lgb_oof  = np.zeros(len(train))
     lgb_test = np.zeros(len(test))
@@ -466,14 +416,11 @@ def main():
         lgb_oof[val_idx]  = val_pred
         lgb_test          += model.predict(X_test_num, num_iteration=model.best_iteration) / N_FOLDS
         lgb_models.append(model)
-        print(f"R²={score:.5f}  ({time.time()-t0:.1f}s)")
+        print(f"R2={score:.5f}  ({time.time()-t0:.1f}s)")
 
     lgb_oof_r2 = r2_score(y_train, lgb_oof)
-    print(f"\nLightGBM OOF R²: {lgb_oof_r2:.5f}  Mean={np.mean(lgb_scores):.5f}  Std={np.std(lgb_scores):.5f}")
+    print(f"\nLightGBM OOF R2: {lgb_oof_r2:.5f}  Mean={np.mean(lgb_scores):.5f}  Std={np.std(lgb_scores):.5f}")
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # MODEL C — XGBoost (GPU Accelerated)
-    # ─────────────────────────────────────────────────────────────────────────────
     print("\n--- MODEL C: XGBoost ---")
     xgb_oof  = np.zeros(len(train))
     xgb_test = np.zeros(len(test))
@@ -491,7 +438,7 @@ def main():
         "reg_alpha":         0.10,
         "reg_lambda":        0.30,
         "tree_method":       "hist",
-        "device":            "cuda",     # Leverage RTX 2050 GPU!
+        "device":            "cuda",
         "random_state":      SEED,
         "n_jobs":            -1,
         "verbosity":         0,
@@ -519,22 +466,18 @@ def main():
         xgb_scores.append(score)
         xgb_oof[val_idx]  = val_pred
         xgb_test          += model.predict(xgb.DMatrix(X_test_num)) / N_FOLDS
-        print(f"R²={score:.5f}  ({time.time()-t0:.1f}s)")
+        print(f"R2={score:.5f}  ({time.time()-t0:.1f}s)")
 
     xgb_oof_r2 = r2_score(y_train, xgb_oof)
-    print(f"\nXGBoost OOF R²: {xgb_oof_r2:.5f}  Mean={np.mean(xgb_scores):.5f}  Std={np.std(xgb_scores):.5f}")
+    print(f"\nXGBoost OOF R2: {xgb_oof_r2:.5f}  Mean={np.mean(xgb_scores):.5f}  Std={np.std(xgb_scores):.5f}")
 
-    # =============================================================================
-    # PHASE 5 — ENSEMBLE OPTIMIZATION
-    # =============================================================================
     print("\n" + "=" * 70)
-    print("PHASE 5 — ENSEMBLE OPTIMIZATION")
+    print("PHASE 5 - ENSEMBLE OPTIMIZATION")
     print("=" * 70)
 
     oof_mat  = np.column_stack([cb_oof, lgb_oof, xgb_oof])
     test_mat = np.column_stack([cb_test, lgb_test, xgb_test])
 
-    # Grid search
     step = 0.05
     grid_results = []
     for w1 in np.arange(0, 1 + 1e-9, step):
@@ -548,9 +491,8 @@ def main():
 
     grid_results.sort(reverse=True)
     bscore, bw1, bw2, bw3 = grid_results[0]
-    print(f"Grid best: CB={bw1:.2f} LGB={bw2:.2f} XGB={bw3:.2f} R²={bscore:.5f}")
+    print(f"Grid best: CB={bw1:.2f} LGB={bw2:.2f} XGB={bw3:.2f} R2={bscore:.5f}")
 
-    # Fine-tune with scipy
     def neg_r2(w):
         wn = np.array(w); wn = wn / wn.sum()
         return -r2_score(y_train, oof_mat @ wn)
@@ -559,15 +501,12 @@ def main():
                    bounds=[(0,1)]*3, options={"maxiter":2000,"ftol":1e-14})
     opt_w = np.array(res.x); opt_w = opt_w / opt_w.sum()
     opt_r2 = r2_score(y_train, oof_mat @ opt_w)
-    print(f"Opt  best: CB={opt_w[0]:.4f} LGB={opt_w[1]:.4f} XGB={opt_w[2]:.4f} R²={opt_r2:.5f}")
+    print(f"Opt  best: CB={opt_w[0]:.4f} LGB={opt_w[1]:.4f} XGB={opt_w[2]:.4f} R2={opt_r2:.5f}")
 
     final_pred = np.clip(test_mat @ opt_w, 0.0, 1.0)
 
-    # =============================================================================
-    # PHASE 6 — ERROR ANALYSIS
-    # =============================================================================
     print("\n" + "=" * 70)
-    print("PHASE 6 — ERROR ANALYSIS")
+    print("PHASE 6 - ERROR ANALYSIS")
     print("=" * 70)
 
     blend_oof = np.clip(oof_mat @ opt_w, 0.0, 1.0)
@@ -588,11 +527,8 @@ def main():
     print(f"Underprediction (>0.05): {(train['residual']>0.05).sum()}")
     print(f"Overprediction (<-0.05): {(train['residual']<-0.05).sum()}")
 
-    # =============================================================================
-    # PHASE 7 — FINAL SUBMISSION
-    # =============================================================================
     print("\n" + "=" * 70)
-    print("PHASE 7 — FINAL SUBMISSION")
+    print("PHASE 7 - FINAL SUBMISSION")
     print("=" * 70)
 
     assert len(final_pred) == len(test), f"Length mismatch! {len(final_pred)} vs {len(test)}"
@@ -609,15 +545,12 @@ def main():
     print(f"Mean  : {final_pred.mean():.6f}")
     print(submission.head())
 
-    # =============================================================================
-    # FINAL SUMMARY
-    # =============================================================================
     print("\n" + "=" * 70)
     print("FINAL SUMMARY")
     print("=" * 70)
     print(f"""
-Model             OOF R²       Fold Mean     Fold Std
-─────────────────────────────────────────────────────
+Model             OOF R2       Fold Mean     Fold Std
+-----------------------------------------------------
 CatBoost        {cb_oof_r2:.5f}      {np.mean(cb_scores):.5f}       {np.std(cb_scores):.5f}
 LightGBM        {lgb_oof_r2:.5f}      {np.mean(lgb_scores):.5f}       {np.std(lgb_scores):.5f}
 XGBoost         {xgb_oof_r2:.5f}      {np.mean(xgb_scores):.5f}       {np.std(xgb_scores):.5f}
@@ -626,7 +559,6 @@ Ensemble (opt)  {opt_r2:.5f}
 Weights: CB={opt_w[0]:.4f}  LGB={opt_w[1]:.4f}  XGB={opt_w[2]:.4f}
 """)
 
-    # Feature importance
     fi = pd.DataFrame({
         "feature":    ALL_NUM,
         "importance": lgb_models[-1].feature_importance(importance_type="gain"),
